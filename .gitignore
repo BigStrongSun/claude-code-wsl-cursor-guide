@@ -1,0 +1,14 @@
+.wsl/
+CUserssunda/
+*.tar
+*.vhd
+*.vhdx
+*.log
+node_modules/
+.DS_Store
+memory.md
+prompt.md
+todo.md
+scripts/
+vllm scripts/
+opencode-serve.system.service
