@@ -9,6 +9,6 @@ node_modules/
 memory.md
 prompt.md
 todo.md
-scripts/
-vllm scripts/
+/scripts/
+/vllm scripts/
 opencode-serve.system.service
