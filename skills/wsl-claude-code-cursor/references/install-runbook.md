@@ -159,13 +159,13 @@ These are different wire protocols. A server may expose both, but Claude Code sh
 
 ## 6. Configure LLM API Keys And cc-switch
 
-Create the Claude settings directory:
+Create the Claude settings directory. For Windows-hosted Cursor with WSL Claude, use a Windows-visible Claude config directory so the Cursor extension and WSL Claude read the same sessions:
 
 ```powershell
-wsl.exe -d openclaw -- bash -lc 'mkdir -p ~/.claude/profiles/templates'
+wsl.exe -d openclaw -- bash -lc 'mkdir -p /mnt/c/Users/sunda/.claude/profiles/templates'
 ```
 
-Create `~/.claude/settings.json`:
+Create `C:\Users\sunda\.claude\settings.json` from Windows, or `/mnt/c/Users/sunda/.claude/settings.json` from WSL:
 
 ```json
 {
@@ -192,18 +192,16 @@ Create `~/.claude/settings.json`:
 }
 ```
 
-Create `~/.claude/profiles/qwen3.6-vllm.json` with the same model/env payload, then set the active profile:
+Create `/mnt/c/Users/sunda/.claude/profiles/qwen3.6-vllm.json` with the same model/env payload, then set the active profile:
 
 ```bash
-printf 'qwen3.6-vllm' > ~/.claude/profiles/.current
-chmod 700 ~/.claude ~/.claude/profiles ~/.claude/profiles/templates
-chmod 600 ~/.claude/settings.json ~/.claude/profiles/qwen3.6-vllm.json ~/.claude/profiles/.current
+printf 'qwen3.6-vllm' > /mnt/c/Users/sunda/.claude/profiles/.current
 ```
 
 Validate:
 
 ```powershell
-wsl.exe -d openclaw -- bash -lc 'cc-switch current; cc-switch view qwen3.6-vllm --raw; cc-switch test -c --endpoint chat --timeout 60s'
+wsl.exe -d openclaw -- bash -lc 'CLAUDE_CONFIG_DIR=/mnt/c/Users/sunda/.claude cc-switch current; CLAUDE_CONFIG_DIR=/mnt/c/Users/sunda/.claude cc-switch view qwen3.6-vllm --raw; CLAUDE_CONFIG_DIR=/mnt/c/Users/sunda/.claude cc-switch test -c --endpoint chat --timeout 60s'
 ```
 
 Expected:
@@ -211,6 +209,22 @@ Expected:
 ```text
 Current configuration: qwen3.6-vllm
 Result: Configuration is functional
+```
+
+If Claude Code was previously run with the default WSL config directory, migrate the existing state into the shared Windows-visible config directory:
+
+```powershell
+wsl.exe -d openclaw -- bash -lc 'mkdir -p /mnt/c/Users/sunda/.claude/projects; cp -a ~/.claude/profiles /mnt/c/Users/sunda/.claude/ 2>/dev/null || true; cp -a ~/.claude/cc-switch /mnt/c/Users/sunda/.claude/ 2>/dev/null || true; cp -a ~/.claude/history.jsonl /mnt/c/Users/sunda/.claude/ 2>/dev/null || true; cp -a ~/.claude/sessions /mnt/c/Users/sunda/.claude/ 2>/dev/null || true; cp -a ~/.claude/projects/-mnt-c-Users-sunda-Documents-Codex-repo-openclaw /mnt/c/Users/sunda/.claude/projects/ 2>/dev/null || true'
+```
+
+Cursor's Sessions view runs in the Windows extension process and lists sessions by Windows project path. If existing sessions were created in WSL, add a Windows project-key junction that points to the WSL project-key directory:
+
+```powershell
+$projects="$env:USERPROFILE\.claude\projects"
+$windowsKey="C--Users-sunda-Documents-Codex-repo-openclaw"
+$wslKey="-mnt-c-Users-sunda-Documents-Codex-repo-openclaw"
+New-Item -ItemType Directory -Force $projects | Out-Null
+cmd /c mklink /J "$projects\$windowsKey" "$projects\$wslKey"
 ```
 
 ## 7. Verify Remote API And Proxy Behavior
@@ -315,8 +329,10 @@ New-Item -ItemType Directory -Force "$env:APPDATA\Cursor\User\scripts" | Out-Nul
 The wrapper intentionally discards the Windows extension's bundled `claude.exe` argument and runs:
 
 ```text
-wsl.exe -d openclaw -- env ... claude <original args>
+wsl.exe -d openclaw -- env HOME=/home/openclaw CLAUDE_CONFIG_DIR=/mnt/c/Users/sunda/.claude ... claude <original args>
 ```
+
+`CLAUDE_CONFIG_DIR` is required for session persistence in the Cursor plugin. Without it, WSL Claude writes conversations under `/home/openclaw/.claude`, while the Windows Cursor extension lists sessions from `C:\Users\sunda\.claude`.
 
 ## 11. Configure Cursor User Settings
 
@@ -400,6 +416,7 @@ $wrapper="$env:APPDATA\Cursor\User\scripts\claude-wsl-wrapper.exe"
 $native="$env:USERPROFILE\.cursor\extensions\anthropic.claude-code-2.1.123-win32-x64\resources\native-binary\claude.exe"
 & $wrapper $native --version
 & $wrapper $native --print "Say hi" --model qwen3.6
+Test-Path "$env:USERPROFILE\.claude\projects\C--Users-sunda-Documents-Codex-repo-openclaw"
 ```
 
 Expected:
@@ -422,6 +439,11 @@ Cursor plugin cannot launch WSL Claude:
 
 - Cause: Windows extension host cannot spawn WSL Linux binaries directly.
 - Fix: use `claudeCode.claudeProcessWrapper` with a Windows `.exe` wrapper.
+
+Cursor plugin loses past conversations after restart:
+
+- Cause: the Windows extension lists sessions from `C:\Users\sunda\.claude`, but WSL Claude wrote them under `/home/openclaw/.claude`.
+- Fix: set `CLAUDE_CONFIG_DIR=/mnt/c/Users/sunda/.claude` in the wrapper, migrate old WSL sessions, and create the Windows project-key junction.
 
 Direct API curl returns Squid HTML/503:
 

@@ -26,6 +26,7 @@ After setup or repair, validate all relevant layers:
 wsl.exe -d openclaw -- bash -lc 'node -v; npm -v; claude --version; cc-switch current'
 wsl.exe -d openclaw -- bash -lc 'cc-switch test -c --endpoint chat --timeout 60s'
 & "$env:APPDATA\Cursor\User\scripts\claude-wsl-wrapper.exe" "$env:USERPROFILE\.cursor\extensions\anthropic.claude-code-2.1.123-win32-x64\resources\native-binary\claude.exe" --print "Say hi" --model qwen3.6
+Test-Path "$env:USERPROFILE\.claude\projects\C--Users-sunda-Documents-Codex-repo-openclaw"
 ```
 
 If direct `curl` to a Tailscale/private API fails but `cc-switch` succeeds, check proxy inheritance before blaming the model server. Use `NO_PROXY/no_proxy` for private IPs such as `100.99.98.29`. Never commit real API keys; use placeholders in public docs.
