@@ -127,10 +127,12 @@ wsl.exe -d openclaw -- bash -lc 'command -v claude; claude --version; command -v
 创建目录：
 
 ```powershell
-wsl.exe -d openclaw -- bash -lc 'mkdir -p ~/.claude/profiles/templates'
+wsl.exe -d openclaw -- bash -lc 'mkdir -p /mnt/c/Users/sunda/.claude/profiles/templates'
 ```
 
-`~/.claude/settings.json` 和 `~/.claude/profiles/qwen3.6-vllm.json` 使用同一组核心配置：
+为了让 Cursor 插件重启后还能看到历史会话，Claude 配置目录要放在 Windows 可见的位置。WSL Claude 通过 `CLAUDE_CONFIG_DIR=/mnt/c/Users/sunda/.claude` 读写它，Cursor 插件则从 `C:\Users\sunda\.claude` 读取 Sessions。
+
+`C:\Users\sunda\.claude\settings.json` 和 `C:\Users\sunda\.claude\profiles\qwen3.6-vllm.json` 使用同一组核心配置：
 
 ```json
 {
@@ -157,15 +159,22 @@ wsl.exe -d openclaw -- bash -lc 'mkdir -p ~/.claude/profiles/templates'
 设置当前 profile：
 
 ```bash
-printf 'qwen3.6-vllm' > ~/.claude/profiles/.current
-chmod 700 ~/.claude ~/.claude/profiles ~/.claude/profiles/templates
-chmod 600 ~/.claude/settings.json ~/.claude/profiles/qwen3.6-vllm.json ~/.claude/profiles/.current
+printf 'qwen3.6-vllm' > /mnt/c/Users/sunda/.claude/profiles/.current
 ```
 
 验证：
 
 ```powershell
-wsl.exe -d openclaw -- bash -lc 'cc-switch current; cc-switch test -c --endpoint chat --timeout 60s'
+wsl.exe -d openclaw -- bash -lc 'CLAUDE_CONFIG_DIR=/mnt/c/Users/sunda/.claude cc-switch current; CLAUDE_CONFIG_DIR=/mnt/c/Users/sunda/.claude cc-switch test -c --endpoint chat --timeout 60s'
+```
+
+如果之前已经在 WSL 默认目录跑过 Claude，需要把旧历史迁到共享目录，并为 Windows 项目路径建立会话目录别名：
+
+```powershell
+wsl.exe -d openclaw -- bash -lc 'mkdir -p /mnt/c/Users/sunda/.claude/projects; cp -a ~/.claude/projects/-mnt-c-Users-sunda-Documents-Codex-repo-openclaw /mnt/c/Users/sunda/.claude/projects/ 2>/dev/null || true; cp -a ~/.claude/sessions /mnt/c/Users/sunda/.claude/ 2>/dev/null || true; cp -a ~/.claude/history.jsonl /mnt/c/Users/sunda/.claude/ 2>/dev/null || true'
+
+$projects="$env:USERPROFILE\.claude\projects"
+cmd /c mklink /J "$projects\C--Users-sunda-Documents-Codex-repo-openclaw" "$projects\-mnt-c-Users-sunda-Documents-Codex-repo-openclaw"
 ```
 
 ## 7. 远程 API 和代理验证
@@ -230,6 +239,12 @@ C:\Users\sunda\AppData\Roaming\Cursor\User\settings.json
 ```
 
 同时可在 `claudeCode.environmentVariables` 中放入同一组 `ANTHROPIC_*`、`NO_PROXY`、`API_TIMEOUT_MS`。
+
+wrapper 内必须设置：
+
+```text
+CLAUDE_CONFIG_DIR=/mnt/c/Users/sunda/.claude
+```
 
 配置后重启 Cursor，或执行 `Developer: Reload Window`。
 
