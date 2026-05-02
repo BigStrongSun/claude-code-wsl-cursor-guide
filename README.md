@@ -1,6 +1,6 @@
 # Claude Code + WSL + Cursor + vLLM 本地部署指南
 
-这个仓库记录的是一套个人本地 AI 开发环境的搭建过程：在 Windows 上使用 Cursor 的 Claude Code 插件，但把真正的 Claude Code CLI 放在 WSL 里运行，再把请求转发到自己部署的 vLLM 服务。后端模型目前是 `qwen3.6`，同时补上了本地 WebSearch 能力，让 Claude Code 的联网搜索请求也可以走自己的服务机。
+这个仓库记录的是一套个人本地 AI 开发环境的搭建过程：在 Windows 上使用 Cursor 的 Claude Code 插件，但把真正的 Claude Code CLI 放在 WSL 里运行，再把请求转发到自己部署的 vLLM 或其它 Anthropic-compatible 服务。示例模型统一写成 `<MODEL_NAME>`，真实模型名、域名、内网 IP 和 API key 都应该在自己的私有配置里填写。
 
 它不是一个“一键安装器”，而是一份尽量可复用、可审计的部署说明。新手可以把它当成路线图：先理解每一层负责什么，再按文档逐步配置。
 
@@ -16,7 +16,7 @@
 最终效果是：
 
 - Cursor 里的 Claude Code 插件可以调用 WSL 里的 `claude`。
-- Claude Code 可以使用自己部署的 `qwen3.6` vLLM 后端，而不是官方 Claude 模型。
+- Claude Code 可以使用自己部署的 vLLM / Anthropic-compatible 后端，而不是官方 Claude 模型。
 - OpenAI-compatible 客户端可以走 `/vllm/v1`。
 - Claude Code / Anthropic Messages-compatible 客户端可以走 `/v1/messages`。
 - Claude Code 的 WebSearch server-side tool 可以在服务机侧通过 vLLM 补丁、本地 SearXNG 和 MCP browser 服务执行。
@@ -29,11 +29,11 @@ Windows Cursor
   -> Claude Code 插件
   -> claudeCode.claudeProcessWrapper
   -> Windows wrapper exe
-  -> wsl.exe -d openclaw -- claude
+  -> wsl.exe -d <WSL_DISTRO> -- claude
   -> WSL Claude Code CLI
   -> Anthropic Messages-compatible API
   -> 公网中转或 Tailscale 内网
-  -> vLLM qwen3.6
+  -> vLLM <MODEL_NAME>
   -> 可选 WebSearch: SearXNG + MCP browser + vLLM patches
 ```
 
@@ -41,21 +41,21 @@ OpenAI-compatible 客户端走另一条入口：
 
 ```text
 OpenAI SDK / OpenAI-compatible tool
-  -> https://www.matrixminecraft.cn:24443/vllm/v1
+  -> <PUBLIC_BASE_URL>/vllm/v1
   -> Zoraxy
-  -> http://100.99.98.29:5000/v1
-  -> vLLM qwen3.6
+  -> http://<TAILSCALE_OR_LAN_HOST>:5000/v1
+  -> vLLM <MODEL_NAME>
 ```
 
 Claude Code / Anthropic-compatible 客户端使用根路径作为 base URL：
 
 ```text
 Claude Code
-  ANTHROPIC_BASE_URL=https://www.matrixminecraft.cn:24443
+  ANTHROPIC_BASE_URL=<PUBLIC_BASE_URL>
   -> POST /v1/messages
   -> Zoraxy
-  -> http://100.99.98.29:5000/v1/messages
-  -> vLLM qwen3.6
+  -> http://<TAILSCALE_OR_LAN_HOST>:5000/v1/messages
+  -> vLLM <MODEL_NAME>
 ```
 
 注意：`ANTHROPIC_BASE_URL` 不要写成 `.../v1`，否则客户端可能拼出 `/v1/v1/messages`。
@@ -80,37 +80,37 @@ Cursor 是 Windows 程序，不能直接执行 WSL 里的 Linux `claude` 二进�
 ```text
 Cursor 插件传入自己的 claude.exe 参数
   -> wrapper 丢弃这个 Windows claude.exe
-  -> wrapper 调用 wsl.exe -d openclaw -- env ... claude <原始参数>
+  -> wrapper 调用 wsl.exe -d <WSL_DISTRO> -- env ... claude <原始参数>
 ```
 
 wrapper 里最关键的几件事：
 
-- 指定 WSL distro：`openclaw`
+- 指定 WSL distro：`<WSL_DISTRO>`
 - 设置稳定 PATH：`/usr/local/bin:/usr/bin:/bin`
 - 设置模型 API 环境变量：`ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN`、模型名等
 - 设置 `NO_PROXY`，避免 Tailscale / 私网请求被错误代理
-- 设置 `CLAUDE_CONFIG_DIR=/mnt/c/Users/sunda/.claude`
+- 设置 `CLAUDE_CONFIG_DIR=/mnt/c/Users/<WINDOWS_USER>/.claude`
 
 `CLAUDE_CONFIG_DIR` 很重要。没有它时，WSL CLI 会把历史写到：
 
 ```text
-/home/openclaw/.claude
+/home/<LINUX_USER>/.claude
 ```
 
 而 Cursor 插件在 Windows 侧会尝试读取：
 
 ```text
-C:\Users\sunda\.claude
+C:\Users\<WINDOWS_USER>\.claude
 ```
 
 两边不一致时，Cursor 重启后可能看不到 CLI 里的历史会话。这个仓库里的 runbook 已经记录了共享配置目录和 Windows project-key junction 的处理方式。
 
-## 服务端侧：vLLM 与 qwen3.6
+## 服务端侧：vLLM 与模型
 
 服务机通过 vLLM 提供模型 API。当前模型名统一写作：
 
 ```text
-qwen3.6
+<MODEL_NAME>
 ```
 
 它同时服务两类协议：
@@ -118,7 +118,7 @@ qwen3.6
 - OpenAI-compatible：`/v1/chat/completions`、`/v1/models`、`/v1/responses`
 - Anthropic-compatible：`/v1/messages`、`/v1/models`
 
-这只是协议兼容，不代表后端部署了 Claude 模型。Claude Code 发来的 Anthropic Messages 请求会被 vLLM 兼容层处理，再交给 `qwen3.6`。
+这只是协议兼容，不代表后端部署了 Claude 模型。Claude Code 发来的 Anthropic Messages 请求会被兼容层处理，再交给你实际部署的模型。
 
 ## WebSearch 是怎么接进去的
 
@@ -148,10 +148,10 @@ OpenAI Responses API 的 `web_search_preview` 则通过 vLLM 的 MCP tool server
 
 ## 公网中转怎么做
 
-公网入口目前是：
+公网入口示例：
 
 ```text
-https://www.matrixminecraft.cn:24443
+<PUBLIC_BASE_URL>
 ```
 
 因为家宽环境下常见的 `80/443` 端口可能不可用，所以 HTTPS 使用高端口 `24443`。
@@ -171,19 +171,19 @@ Zoraxy 的职责是透明反向代理。它不应该理解 WebSearch，也不应
 OpenAI-compatible 客户端使用：
 
 ```bash
-export OPENAI_BASE_URL=https://www.matrixminecraft.cn:24443/vllm/v1
+export OPENAI_BASE_URL=<PUBLIC_BASE_URL>/vllm/v1
 export OPENAI_API_KEY=<VLLM_API_KEY>
 ```
 
 Claude Code 使用：
 
 ```bash
-export ANTHROPIC_BASE_URL=https://www.matrixminecraft.cn:24443
+export ANTHROPIC_BASE_URL=<PUBLIC_BASE_URL>
 export ANTHROPIC_API_KEY=<VLLM_API_KEY>
 export ANTHROPIC_AUTH_TOKEN=<VLLM_API_KEY>
-export ANTHROPIC_DEFAULT_OPUS_MODEL=qwen3.6
-export ANTHROPIC_DEFAULT_SONNET_MODEL=qwen3.6
-export ANTHROPIC_DEFAULT_HAIKU_MODEL=qwen3.6
+export ANTHROPIC_DEFAULT_OPUS_MODEL=<MODEL_NAME>
+export ANTHROPIC_DEFAULT_SONNET_MODEL=<MODEL_NAME>
+export ANTHROPIC_DEFAULT_HAIKU_MODEL=<MODEL_NAME>
 ```
 
 详细路由表和验证命令见 [docs/vllm-public-access.md](docs/vllm-public-access.md)。
@@ -193,33 +193,33 @@ export ANTHROPIC_DEFAULT_HAIKU_MODEL=qwen3.6
 先确认 WSL 里的工具链：
 
 ```powershell
-wsl.exe -d openclaw -- bash -lc 'node -v; npm -v; claude --version; cc-switch current'
+wsl.exe -d <WSL_DISTRO> -- bash -lc 'node -v; npm -v; claude --version; cc-switch current'
 ```
 
 验证 Cursor wrapper：
 
 ```powershell
 $wrapper="$env:APPDATA\Cursor\User\scripts\claude-wsl-wrapper.exe"
-$native="$env:USERPROFILE\.cursor\extensions\anthropic.claude-code-2.1.123-win32-x64\resources\native-binary\claude.exe"
+$native="$env:USERPROFILE\.cursor\extensions\anthropic.claude-code-<EXTENSION_VERSION>-win32-x64\resources\native-binary\claude.exe"
 & $wrapper $native --version
 ```
 
 验证 OpenAI-compatible 公网入口：
 
 ```powershell
-curl.exe -k https://www.matrixminecraft.cn:24443/vllm/v1/models
+curl.exe -k <PUBLIC_BASE_URL>/vllm/v1/models
 ```
 
 验证 Anthropic-compatible 公网入口：
 
 ```powershell
-curl.exe -k https://www.matrixminecraft.cn:24443/v1/models
+curl.exe -k <PUBLIC_BASE_URL>/v1/models
 ```
 
 验证服务机三个核心服务：
 
 ```powershell
-wsl -d Ubuntu -- bash -lc "systemctl --user is-active vllm-qwen36-tp.service; systemctl --user is-active searxng-local.service; systemctl --user is-active agent-websearch.service"
+wsl -d <SERVER_WSL_DISTRO> -- bash -lc "systemctl --user is-active <VLLM_SERVICE>; systemctl --user is-active <SEARXNG_SERVICE>; systemctl --user is-active <WEBSEARCH_SERVICE>"
 ```
 
 ## 安全说明
@@ -246,7 +246,7 @@ wsl -d Ubuntu -- bash -lc "systemctl --user is-active vllm-qwen36-tp.service; sy
 如果你 fork 或复用这个仓库，建议先搜索这些模式：
 
 ```bash
-grep -R "ghp_\|sk-\|vllm-local" -n .
+grep -R "ghp_\|sk-\|<REAL_PRIVATE_HOST_OR_TOKEN_PATTERN>" -n .
 ```
 
 ## 适合复用的部分
