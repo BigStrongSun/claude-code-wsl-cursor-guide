@@ -67,6 +67,7 @@ Claude Code
 | 文档 | 适合谁看 | 内容 |
 | --- | --- | --- |
 | [wsl-claude-code-cursor-install.md](wsl-claude-code-cursor-install.md) | 第一次搭建的人 | 中文主线安装说明：Windows、WSL、Claude Code、`cc-switch`、Cursor wrapper。 |
+| [skills/wsl-claude-code-cursor/SKILL.md](skills/wsl-claude-code-cursor/SKILL.md) | 想交给 Codex 自动执行的人 | 可复用 Codex skill，聚焦 WSL + Cursor 里运行 Claude Code，不管理服务机和代理。 |
 | [skills/wsl-claude-code-cursor/references/install-runbook.md](skills/wsl-claude-code-cursor/references/install-runbook.md) | 想复用流程的人 | 更结构化的 runbook，适合按步骤验证和排障。 |
 | [skills/wsl-claude-code-cursor/scripts/ClaudeWslWrapper.cs](skills/wsl-claude-code-cursor/scripts/ClaudeWslWrapper.cs) | 需要接 Cursor 插件的人 | Windows 到 WSL 的 Claude Code wrapper 模板。 |
 | [docs/vllm-public-access.md](docs/vllm-public-access.md) | 需要公网访问的人 | 公网入口、OpenAI/Anthropic base URL、Zoraxy 路由和透明转发要求。 |
