@@ -18,6 +18,11 @@ Windows Cursor Claude Code 插件
 - Claude Code 使用 Anthropic 兼容协议，环境变量是 `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN`、`ANTHROPIC_MODEL`。
 - OpenCode 使用 OpenAI 兼容协议，通常是 `baseURL=http://100.99.98.29:5000/v1` 和 `/v1/chat/completions`。
 
+如果通过公网中转访问服务机，请看：
+
+- `docs/vllm-public-access.md`：公网域名、Zoraxy 路由、OpenAI/Anthropic base URL。
+- `docs/vllm-websearch-service.md`：服务机 vLLM、SearXNG、MCP browser 和 Claude Code WebSearch 补丁。
+
 ## 2. WSL 检查或安装
 
 ```powershell

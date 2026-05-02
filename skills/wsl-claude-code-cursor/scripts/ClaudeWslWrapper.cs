@@ -16,6 +16,7 @@ internal static class ClaudeWslWrapper
             "--",
             "env",
             "HOME=/home/openclaw",
+            "CLAUDE_CONFIG_DIR=/mnt/c/Users/sunda/.claude",
             "PATH=/usr/local/bin:/usr/bin:/bin",
             "ANTHROPIC_BASE_URL=http://100.99.98.29:5000",
             "ANTHROPIC_AUTH_TOKEN=<YOUR_LLM_API_KEY>",
