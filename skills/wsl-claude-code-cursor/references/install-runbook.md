@@ -409,7 +409,40 @@ Add:
 
 Reload Cursor with `Developer: Reload Window`, or restart Cursor.
 
-## 12. Validate Cursor Wrapper
+## 12. Configure Bypass Permissions Optional
+
+Claude Code bypass permissions skips permission prompts. Treat it as an explicit user choice, not a silent default. If the user did not already ask for it, explain the risk and ask whether they want it enabled.
+
+Use the bundled script from the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\skills\wsl-claude-code-cursor\scripts\Set-ClaudeBypassPermissions.ps1 -Mode status
+```
+
+Enable bypass permissions:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\skills\wsl-claude-code-cursor\scripts\Set-ClaudeBypassPermissions.ps1 -Mode enable
+```
+
+Disable bypass permissions:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\skills\wsl-claude-code-cursor\scripts\Set-ClaudeBypassPermissions.ps1 -Mode disable
+```
+
+The script updates both layers:
+
+- Cursor settings: `claudeCode.allowDangerouslySkipPermissions=true` and `claudeCode.initialPermissionMode=bypassPermissions`.
+- Claude settings: `permissions.defaultMode=bypassPermissions`.
+
+When disabling, the script sets `claudeCode.allowDangerouslySkipPermissions=false` and removes only the bypass defaults it previously manages. It keeps unrelated settings in place. If the wrapper uses a non-default shared config directory, pass it explicitly:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\skills\wsl-claude-code-cursor\scripts\Set-ClaudeBypassPermissions.ps1 -Mode enable -ClaudeConfigDir "C:\Users\sunda\.claude"
+```
+
+## 13. Validate Cursor Wrapper
 
 Run from PowerShell:
 
@@ -430,7 +463,7 @@ Hi!
 
 If this works, the Cursor extension should work after reload.
 
-## 13. Common Failure Modes
+## 14. Common Failure Modes
 
 `claude` works interactively but not from tools:
 

@@ -1,11 +1,13 @@
 ---
 name: wsl-claude-code-cursor
-description: Set up, repair, or document Claude Code running in WSL for Windows Cursor through the official Claude Code extension and a Windows-to-WSL process wrapper. Use when installing or fixing WSL Node/npm, Claude Code CLI, cc-switch profiles, Cursor `claudeCode.claudeProcessWrapper`, shared Claude session history, Chinese setup prompts, or when changing Claude Code API endpoint/model/token settings and needing to verify that the target LLM endpoint is Anthropic Messages-compatible.
+description: Set up, repair, or document Claude Code running in WSL for Windows Cursor through the official Claude Code extension and a Windows-to-WSL process wrapper. Use when installing or fixing WSL Node/npm, Claude Code CLI, cc-switch profiles, Cursor `claudeCode.claudeProcessWrapper`, shared Claude session history, Claude Code bypass permissions mode, Chinese setup prompts, or when changing Claude Code API endpoint/model/token settings and needing to verify that the target LLM endpoint is Anthropic Messages-compatible.
 ---
 
 # WSL Claude Code Cursor
 
 这个 skill 用来让 Codex 帮用户在 Windows + WSL + Cursor 环境里安装、修复或解释 Claude Code。它只处理客户端/工作站侧：WSL、Node/npm、Claude Code CLI、`cc-switch`、Cursor 插件、Windows-to-WSL wrapper、Claude 本地配置和会话历史。不要用这个 skill 去管理服务机、vLLM 部署、SearXNG、Zoraxy、公网代理、证书或模型权重。
+
+权限模式属于高风险配置。除非用户已经明确要求开启或关闭 bypass permissions，否则在安装或修复完成前要主动询问用户是否开启。开启前要说明：`bypassPermissions` 会让 Claude Code 跳过权限确认，更适合受信任的本地环境，不适合不可信仓库或不熟悉的命令执行场景。
 
 ## 中文默认提示词
 
@@ -27,6 +29,12 @@ description: Set up, repair, or document Claude Code running in WSL for Windows 
 使用 wsl-claude-code-cursor skill，帮我修复 Cursor 重启后看不到 WSL Claude Code 历史会话的问题。请检查 CLAUDE_CONFIG_DIR、Windows .claude 目录、WSL 项目 key 和 Cursor Sessions 视图读取路径。
 ```
 
+如果用户想管理完整权限模式，可以这样说：
+
+```text
+使用 wsl-claude-code-cursor skill，帮我检查 Claude Code 当前是否开启 bypass permissions。如果没有开启，请先说明风险并询问我是否开启；如果我确认，就用脚本同时更新 Cursor 设置和 Claude settings.json。也请提供关闭命令。
+```
+
 ## 使用边界
 
 应该做：
@@ -37,6 +45,7 @@ description: Set up, repair, or document Claude Code running in WSL for Windows 
 - 配置 Cursor 用户设置里的 `claudeCode.claudeProcessWrapper`。
 - 编译 Windows wrapper，让 Cursor 能启动 WSL `claude`。
 - 配置 `CLAUDE_CONFIG_DIR`，让 Cursor 插件和 WSL CLI 共用历史会话。
+- 询问并配置 Claude Code bypass permissions，支持开启、关闭和状态检查。
 - 验证 Anthropic-compatible API 是否满足 Claude Code 需要。
 
 不应该做：
@@ -64,7 +73,46 @@ description: Set up, repair, or document Claude Code running in WSL for Windows 
    - 会话历史问题：`CLAUDE_CONFIG_DIR`、Windows project key、WSL project key、junction。
 5. 使用 [scripts/ClaudeWslWrapper.cs](scripts/ClaudeWslWrapper.cs) 作为 wrapper 模板。编译到 `%APPDATA%\Cursor\User\scripts`。
 6. 优先把 Cursor 场景的 Claude 配置放到 Windows 可见目录，例如 `/mnt/c/Users/<user>/.claude`，并通过 `CLAUDE_CONFIG_DIR` 注入 WSL Claude。
-7. 所有示例密钥必须写成 `<YOUR_LLM_API_KEY>` 或 `<VLLM_API_KEY>`。
+7. 权限模式处理：
+   - 先查看状态：`powershell -ExecutionPolicy Bypass -File skills/wsl-claude-code-cursor/scripts/Set-ClaudeBypassPermissions.ps1 -Mode status`。
+   - 如果用户没有明确要求开启或关闭，主动询问：“是否开启 Claude Code bypass permissions？开启后会跳过权限确认，只建议在受信任本地环境使用。”
+   - 用户确认开启时，运行脚本的 `enable` 模式。
+   - 用户确认关闭时，运行脚本的 `disable` 模式。
+   - 不要在未确认时擅自开启 bypass permissions。
+8. 所有示例密钥必须写成 `<YOUR_LLM_API_KEY>` 或 `<VLLM_API_KEY>`。
+
+## Bypass Permissions 脚本
+
+脚本路径：
+
+```text
+scripts/Set-ClaudeBypassPermissions.ps1
+```
+
+查看状态：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\skills\wsl-claude-code-cursor\scripts\Set-ClaudeBypassPermissions.ps1 -Mode status
+```
+
+开启：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\skills\wsl-claude-code-cursor\scripts\Set-ClaudeBypassPermissions.ps1 -Mode enable
+```
+
+关闭：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\skills\wsl-claude-code-cursor\scripts\Set-ClaudeBypassPermissions.ps1 -Mode disable
+```
+
+脚本会同时处理：
+
+- Cursor 用户设置：`claudeCode.allowDangerouslySkipPermissions` 和 `claudeCode.initialPermissionMode`。
+- Claude Code 设置：`permissions.defaultMode`。
+
+默认路径是 `%APPDATA%\Cursor\User\settings.json` 和 `%USERPROFILE%\.claude\settings.json`。如果当前 wrapper 使用了其它 `CLAUDE_CONFIG_DIR`，运行脚本时传入 `-ClaudeConfigDir <path>`。
 
 ## API 切换规则
 

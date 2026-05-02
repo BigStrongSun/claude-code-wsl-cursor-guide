@@ -1,3 +1,3 @@
 display_name: WSL Claude Code Cursor
 short_description: Run Claude Code in WSL from Windows Cursor.
-default_prompt: Set up or repair Claude Code in WSL for Windows Cursor, including the process wrapper, shared session history, cc-switch profiles, and Anthropic-compatible API settings.
+default_prompt: Set up or repair Claude Code in WSL for Windows Cursor, including the process wrapper, shared session history, cc-switch profiles, Anthropic-compatible API settings, and optional bypass permissions after asking me first.

@@ -40,6 +40,7 @@ wsl-claude-code-cursor/
     llm-api-requirements.md
   scripts/
     ClaudeWslWrapper.cs
+    Set-ClaudeBypassPermissions.ps1
 ```
 
 | 文件 | 作用 |
@@ -50,6 +51,7 @@ wsl-claude-code-cursor/
 | `references/install-runbook.md` | 完整安装和修复 runbook。 |
 | `references/llm-api-requirements.md` | 切换 API/model/token 时，后端 LLM 必须满足的要求。 |
 | `scripts/ClaudeWslWrapper.cs` | Windows 到 WSL 的 wrapper 模板。 |
+| `scripts/Set-ClaudeBypassPermissions.ps1` | 查看、开启或关闭 Claude Code bypass permissions 的脚本。 |
 
 ## 推荐中文提示词
 
@@ -71,6 +73,12 @@ wsl-claude-code-cursor/
 使用 wsl-claude-code-cursor skill，帮我修复 Cursor 重启后看不到 WSL Claude Code 历史会话的问题。请检查 CLAUDE_CONFIG_DIR、Windows .claude 目录、WSL 项目 key 和 Cursor Sessions 视图读取路径。
 ```
 
+管理 bypass permissions：
+
+```text
+使用 wsl-claude-code-cursor skill，帮我检查 Claude Code 当前是否开启 bypass permissions。如果没有开启，请先说明风险并询问我是否开启；如果我确认，就用脚本同时更新 Cursor 设置和 Claude settings.json。也请提供关闭命令。
+```
+
 ## 能做什么
 
 - 安装或修复 WSL 中的 Node.js/npm。
@@ -80,6 +88,7 @@ wsl-claude-code-cursor/
 - 编译 Windows wrapper。
 - 更新 Cursor 的 `claudeCode.claudeProcessWrapper`。
 - 让 Cursor 插件和 WSL CLI 共用 Claude 会话历史。
+- 主动询问是否开启 Claude Code bypass permissions，并支持用脚本开启、关闭和查看状态。
 - 检查目标 API 是否满足 Claude Code 的 Anthropic Messages 兼容要求。
 
 ## 不做什么
@@ -136,6 +145,45 @@ CLAUDE_CONFIG_DIR=/mnt/c/Users/<user>/.claude
 ```
 
 这样 Cursor 和 WSL Claude 都读写 Windows 可见的同一套历史。
+
+## 关键设计：bypass permissions 可控开关
+
+Claude Code 的 bypass permissions 会跳过权限确认，适合明确受信任的本地开发环境，但不适合不可信仓库、陌生命令或需要逐步审查的场景。
+
+所以这个 skill 的默认行为是：
+
+- 用户已经明确要求开启：直接用脚本开启。
+- 用户已经明确要求关闭：直接用脚本关闭。
+- 用户没有明确说：先说明风险，再询问是否开启。
+
+查看当前状态：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\skills\wsl-claude-code-cursor\scripts\Set-ClaudeBypassPermissions.ps1 -Mode status
+```
+
+开启：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\skills\wsl-claude-code-cursor\scripts\Set-ClaudeBypassPermissions.ps1 -Mode enable
+```
+
+关闭：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\skills\wsl-claude-code-cursor\scripts\Set-ClaudeBypassPermissions.ps1 -Mode disable
+```
+
+脚本默认更新：
+
+- `%APPDATA%\Cursor\User\settings.json`
+- `%USERPROFILE%\.claude\settings.json`
+
+如果 wrapper 使用了自定义 `CLAUDE_CONFIG_DIR`，运行时传入：
+
+```powershell
+-ClaudeConfigDir "D:\path\to\.claude"
+```
 
 ## 验证
 
